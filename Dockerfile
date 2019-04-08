@@ -1,5 +1,5 @@
 FROM phusion/baseimage:latest
-MAINTAINER Miloš Kozák <milos.kozak@lejmr.com>
+MAINTAINER Dmytro Panchuk
 
 # Suporting software versions
 ARG IREDMAIL_VERSION=0.9.8
@@ -7,9 +7,11 @@ ARG IREDMAIL_VERSION=0.9.8
 # Default values changable at startup
 ARG DOMAIN=DOMAIN
 ARG HOSTNAME=HOSTNAME
+ENV SOGO_WORKERS=2
+ENV TZ=Etc/UTC
 
 ### Installation
-# Prerequisites
+# Prerequisites
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "APT::Install-Recommends 0;" >> /etc/apt/apt.conf.d/01-no-recommends \
     && echo "APT::Install-Suggests 0;" >> /etc/apt/apt.conf.d/01-no-recommends \
@@ -58,8 +60,8 @@ RUN sed s/$(hostname)/$HOSTNAME.$DOMAIN/ /etc/hosts > /tmp/hosts_ \
        AUTO_CLEANUP_REPLACE_MYSQL_CONFIG=y \
        AUTO_CLEANUP_RESTART_POSTFIX=n \
        bash iRedMail.sh \
-    && apt-get autoremove -y -q \
-    && apt-get clean -y -q
+    && apt-get --allow-unauthenticated autoremove -y -q \
+    && apt-get --allow-unauthenticated clean -y -q
 
 ### Final configuration
 RUN sed -i '/^Foreground /c Foreground true' /etc/clamav/clamd.conf \
@@ -78,10 +80,7 @@ RUN tar jcf /root/mysql.tar.bz2 /var/lib/mysql && rm -rf /var/lib/mysql \
     && tar jcf /root/vmail.tar.bz2 /var/vmail && rm -rf /var/vmail \
     && rm -rf /var/lib/clamav/*
 
-ADD update.sh /sbin/update-iredmail
-
-
-### Startup services
+### Startup services
 # Core Services
 ADD rc.local /etc/rc.local
 ADD services/mysql.sh /etc/service/mysql/run
@@ -103,7 +102,7 @@ ADD services/clamav-daemon.sh /etc/service/clamav-daemon/run
 ADD services/clamav-freshclam.sh /etc/service/clamav-freshclam/run
 ADD services/netdata.sh /etc/service/netdata/run
 ADD services/mlmmjadmin.sh /etc/service/mlmmjadmin/run
-
+ADD update.sh /sbin/update-iredmail
 
 ### Purge some packets and save disk space
 RUN apt-get purge -y -q dialog apt-utils augeas-tools \
@@ -115,7 +114,3 @@ RUN apt-get purge -y -q dialog apt-utils augeas-tools \
 # Apache: 80/tcp, 443/tcp Postfix: 25/tcp, 587/tcp
 # Dovecot: 110/tcp, 143/tcp, 993/tcp, 995/tcp
 EXPOSE 80 443 25 587 110 143 993 995
-
-# Default values changable at startup
-ENV SOGO_WORKERS=2
-ENV TZ=Etc/UTC
